@@ -27,7 +27,7 @@ export interface User {
 interface AuthContextType {
     user: User | null;
     loading: boolean;
-    login: (token: string) => void;
+    login: (token: string) => Promise<void>;
     logout: () => void;
     refreshUser: () => Promise<void>;
 }
@@ -66,10 +66,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [fetchUser]);
 
     const login = useCallback(
-        (token: string) => {
+        async (token: string) => {
             localStorage.setItem("token", token);
             document.cookie = `token=${token}; path=/; max-age=86400`;
-            fetchUser();
+            await fetchUser();
         },
         [fetchUser]
     );

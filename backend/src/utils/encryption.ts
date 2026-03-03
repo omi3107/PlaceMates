@@ -13,7 +13,7 @@ const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 
 function getEncryptionKey(): Buffer {
-    const keyHex = process.env.TOKEN_ENCRYPTION_KEY;
+    let keyHex = (process.env.TOKEN_ENCRYPTION_KEY || "").trim();
     if (!keyHex || keyHex.length !== 64) {
         throw new Error(
             "TOKEN_ENCRYPTION_KEY must be set to a 64-character hex string (32 bytes)"

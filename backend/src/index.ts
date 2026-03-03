@@ -6,6 +6,7 @@ import healthRouter from "./routes/health.js";
 
 import passport from "./config/passport.js";
 import authRouter from "./routes/auth.js";
+import linkedinRouter from "./routes/linkedin.js";
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.use(passport.initialize());
 // ── Routes ────────────────────────────────────────────────
 app.use("/api/health", healthRouter);
 app.use("/api/auth", authRouter);
+app.use("/api/linkedin", linkedinRouter);
 
 // ── Error handler (must be last) ──────────────────────────
 app.use(errorHandler);

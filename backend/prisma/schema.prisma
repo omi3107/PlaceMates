@@ -16,6 +16,7 @@ model UserAuth {
   email     String   @unique
   profile   UserProfile?
   oauth     OAuthAccount[]
+  linkedinData LinkedInData?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -44,4 +45,12 @@ model OAuthAccount {
   @@unique([provider, providerUserId])
 }
 
-// Removed all Career Intelligence architecture tables.
+model LinkedInData {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      UserAuth @relation(fields: [userId], references: [id])
+  profile   Json     // stores the full LinkedInProfile object
+  source    String   // "apify" | "zip_upload"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

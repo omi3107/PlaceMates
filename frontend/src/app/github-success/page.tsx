@@ -22,7 +22,7 @@ function GitHubSuccessHandler() {
 
                 // Short delay so user sees the success state
                 setTimeout(() => {
-                    if (mounted) router.replace("/");
+                    if (mounted) router.replace("/connect-accounts");
                 }, 1200);
             } catch {
                 if (!mounted) return;
@@ -30,7 +30,7 @@ function GitHubSuccessHandler() {
 
                 // Redirect anyway after a moment
                 setTimeout(() => {
-                    if (mounted) router.replace("/");
+                    if (mounted) router.replace("/connect-accounts");
                 }, 2000);
             }
         }
