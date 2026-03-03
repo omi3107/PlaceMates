@@ -61,7 +61,7 @@ export async function scrapeLinkedInProfile(url: string): Promise<ApifyScrapeRes
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                urls: [url.trim()],
+                startUrls: [{ url: url.trim() }],
             }),
         });
 
@@ -88,6 +88,15 @@ export async function scrapeLinkedInProfile(url: string): Promise<ApifyScrapeRes
 
         // Log raw data for debugging
         console.log("[Apify] Raw response:", JSON.stringify(raw, null, 2));
+
+        // Check for Apify actor-level errors (e.g. monthly run limits)
+        if (raw.errorMessage) {
+            console.error("[Apify] Actor error:", raw.errorMessage);
+            return {
+                success: false,
+                error: `Apify scraper error: ${raw.errorMessage}`,
+            };
+        }
 
         // Check for private profile indicators
         if (raw.error || raw.isPrivate || (!raw.first_name && !raw.full_name && !raw.headline)) {
