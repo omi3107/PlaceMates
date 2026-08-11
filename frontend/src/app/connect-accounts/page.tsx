@@ -34,27 +34,28 @@ export default function ConnectAccountsPage() {
     // ── Card expansion state ───────────────────────────────
     const [expandedCard, setExpandedCard] = useState<"github" | "linkedin" | null>(null);
 
-    // ── GitHub state ────────────────────────────────────────
+    // ── GitHub state ───────────────────────────────────────
     const [githubUrl, setGithubUrl] = useState("");
     const [githubState, setGithubState] = useState<CardState>("idle");
     const [githubError, setGithubError] = useState("");
 
-    // ── GitHub Sync & Analyze state ─────────────────────────
+    // ── GitHub Sync & Analyze state ────────────────────────
     const [isSyncingGithub, setIsSyncingGithub] = useState(false);
     const [isAnalyzingGithub, setIsAnalyzingGithub] = useState(false);
     const [hasSynced, setHasSynced] = useState(false);
     const [hasAnalyzed, setHasAnalyzed] = useState(false);
 
-    // ── LinkedIn state ──────────────────────────────────────
+    // ── LinkedIn state ─────────────────────────────────────
     const [linkedinUrl, setLinkedinUrl] = useState("");
     const [linkedinState, setLinkedinState] = useState<CardState>("idle");
     const [linkedinError, setLinkedinError] = useState("");
+    const [isPrivate, setIsPrivate] = useState(false);
     const [showZipUpload, setShowZipUpload] = useState(false);
     const [zipFile, setZipFile] = useState<File | null>(null);
     const [zipState, setZipState] = useState<CardState>("idle");
     const [zipError, setZipError] = useState("");
 
-    // ── Mouse position for dynamic gradient ─────────────────
+    // ── Mouse position for dynamic gradient ────────────────
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
     useEffect(() => {
@@ -69,25 +70,15 @@ export default function ConnectAccountsPage() {
         return () => window.removeEventListener("mousemove", handleMouseMove);
     }, []);
 
-    // ── Derive connection status from state to force re-login per session ──
-    const [githubConnected, setGithubConnected] = useState(false);
-    const [linkedinConnected, setLinkedinConnected] = useState(false);
-
-    useEffect(() => {
-        const queryParams = new URLSearchParams(window.location.search);
-        if (queryParams.get("github") === "connected") {
-            setGithubConnected(true);
-        }
-    }, []);
-
-    // Continue is enabled only when GitHub connected + synced + analyzed + LinkedIn connected
-    const canContinue = githubConnected && hasSynced && hasAnalyzed && linkedinConnected;
+    // Derive connection status from user data
+    const githubConnected = user?.githubConnected || false;
+    const linkedinConnected = user?.linkedinImported || false;
+    const bothConnected = githubConnected && linkedinConnected;
 
     // ── GitHub URL connect handler ──────────────────────────
     function handleGitHubConnect() {
         if (!githubUrl.trim()) return;
 
-        // Validate GitHub URL
         const ghRegex = /^https?:\/\/(www\.)?github\.com\/[\w-]+\/?$/;
         if (!ghRegex.test(githubUrl.trim())) {
             setGithubState("error");
@@ -98,7 +89,6 @@ export default function ConnectAccountsPage() {
         setGithubState("loading");
         setGithubError("");
 
-        // Redirect to OAuth flow — the GitHub OAuth will link the account
         const token = localStorage.getItem("token");
         window.location.href = `${API_BASE}/auth/github?token=${token}`;
     }
@@ -109,8 +99,6 @@ export default function ConnectAccountsPage() {
         try {
             const { syncedCount } = await githubApi.syncRepos();
             setHasSynced(true);
-
-            // Show a brief visual confirmation (optional: could add toast here)
             console.log(`Synced ${syncedCount} repositories`);
         } catch (error) {
             console.error("GitHub sync failed:", (error as Error).message);
@@ -132,26 +120,30 @@ export default function ConnectAccountsPage() {
         }
     }
 
-    // ── LinkedIn URL submit handler ─────────────────────────
-    // NOTE: Apify API limit is exhausted, so we always redirect to ZIP upload
-    function handleLinkedInUrl() {
+    // ── LinkedIn URL submit handler ────────────────────────
+    async function handleLinkedInUrl() {
         if (!linkedinUrl.trim()) return;
 
-        // Validate LinkedIn URL format
-        const liRegex = /^https?:\/\/(www\.)?linkedin\.com\/in\/[\w-]+\/?$/;
-        if (!liRegex.test(linkedinUrl.trim())) {
-            setLinkedinState("error");
-            setLinkedinError("Invalid LinkedIn URL. Expected format: https://www.linkedin.com/in/your-username");
-            return;
-        }
+        setLinkedinState("loading");
+        setLinkedinError("");
+        setIsPrivate(false);
 
-        // API scraper is temporarily disabled — redirect to ZIP upload
-        setLinkedinState("error");
-        setLinkedinError("LinkedIn API scraping is temporarily unavailable. Please upload your LinkedIn data ZIP instead.");
-        setShowZipUpload(true);
+        const result = await connectApi.validateLinkedInUrl(linkedinUrl.trim());
+
+        if (result.success) {
+            setLinkedinState("success");
+            await refreshUser();
+        } else {
+            setLinkedinState("error");
+            setLinkedinError(result.error || "Failed to fetch profile");
+            if (result.isPrivate) {
+                setIsPrivate(true);
+                setShowZipUpload(true);
+            }
+        }
     }
 
-    // ── LinkedIn ZIP upload handler ─────────────────────────
+    // ── LinkedIn ZIP upload handler ────────────────────────
     async function handleZipUpload() {
         if (!zipFile) return;
 
@@ -164,7 +156,6 @@ export default function ConnectAccountsPage() {
             setZipState("success");
             setLinkedinState("success");
             setShowZipUpload(false);
-            setLinkedinConnected(true);
             await refreshUser();
         } else {
             setZipState("error");
@@ -172,7 +163,7 @@ export default function ConnectAccountsPage() {
         }
     }
 
-    // ── Loading / unauthenticated ───────────────────────────
+    // ── Loading / unauthenticated ──────────────────────────
     if (loading || !user) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-background">
@@ -201,10 +192,7 @@ export default function ConnectAccountsPage() {
             {/* Navigation */}
             <nav className="relative z-50 bg-transparent">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-20">
-                    <Link
-                        href="/"
-                        className="flex items-center gap-3 group cursor-pointer"
-                    >
+                    <Link href="/" className="flex items-center gap-3 group cursor-pointer">
                         <div className="relative w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
                             P
                             <div className="absolute inset-0 bg-white/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -223,6 +211,10 @@ export default function ConnectAccountsPage() {
             <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-20">
                 {/* Header */}
                 <div className="text-center mb-12 space-y-4">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium border border-primary/20">
+                        <ShieldCheck className="w-4 h-4" />
+                        Step 2 of 3 — Connect Your Accounts
+                    </div>
                     <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
                         Connect Your{" "}
                         <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
@@ -246,9 +238,9 @@ export default function ConnectAccountsPage() {
                                 : "border-border/50 bg-muted/20 backdrop-blur-xl hover:bg-muted/30 hover:border-border/70"
                             }`}
                         onClick={() => {
-                            if (expandedCard !== "github") {
+                            if (!githubConnected && expandedCard !== "github") {
                                 setExpandedCard("github");
-                            } else {
+                            } else if (expandedCard === "github") {
                                 setExpandedCard(null);
                             }
                         }}
@@ -282,21 +274,23 @@ export default function ConnectAccountsPage() {
                                         </p>
                                     </div>
                                 </div>
-                                <ChevronDown
-                                    className={`w-5 h-5 text-muted-foreground transition-transform duration-300 ${expandedCard === "github" ? "rotate-180" : ""
-                                        }`}
-                                />
+                                {!githubConnected && (
+                                    <ChevronDown
+                                        className={`w-5 h-5 text-muted-foreground transition-transform duration-300 ${expandedCard === "github" ? "rotate-180" : ""
+                                            }`}
+                                    />
+                                )}
                             </div>
 
+                            {/* Expanded content */}
                             <div
-                                className={`overflow-hidden transition-all duration-500 ease-in-out ${expandedCard === "github"
+                                className={`overflow-hidden transition-all duration-500 ease-in-out ${expandedCard === "github" && !githubConnected
                                     ? "max-h-[600px] opacity-100 mt-6"
                                     : "max-h-0 opacity-0"
                                     }`}
                             >
                                 <div
-                                    className={`pt-6 border-t space-y-4 ${githubConnected ? "border-emerald-500/20" : "border-border/40"
-                                        }`}
+                                    className="pt-6 border-t border-border/40 space-y-4"
                                     onClick={(e) => e.stopPropagation()}
                                 >
                                     {!githubConnected ? (
@@ -433,9 +427,9 @@ export default function ConnectAccountsPage() {
                                 : "border-border/50 bg-muted/20 backdrop-blur-xl hover:bg-muted/30 hover:border-border/70"
                             }`}
                         onClick={() => {
-                            if (expandedCard !== "linkedin") {
+                            if (!linkedinConnected && expandedCard !== "linkedin") {
                                 setExpandedCard("linkedin");
-                            } else {
+                            } else if (expandedCard === "linkedin") {
                                 setExpandedCard(null);
                             }
                         }}
@@ -469,15 +463,17 @@ export default function ConnectAccountsPage() {
                                         </p>
                                     </div>
                                 </div>
-                                <ChevronDown
-                                    className={`w-5 h-5 text-muted-foreground transition-transform duration-300 ${expandedCard === "linkedin" ? "rotate-180" : ""
-                                        }`}
-                                />
+                                {!linkedinConnected && (
+                                    <ChevronDown
+                                        className={`w-5 h-5 text-muted-foreground transition-transform duration-300 ${expandedCard === "linkedin" ? "rotate-180" : ""
+                                            }`}
+                                    />
+                                )}
                             </div>
 
                             {/* Expanded content */}
                             <div
-                                className={`overflow-hidden transition-all duration-500 ease-in-out ${expandedCard === "linkedin"
+                                className={`overflow-hidden transition-all duration-500 ease-in-out ${expandedCard === "linkedin" && !linkedinConnected
                                     ? "max-h-[600px] opacity-100 mt-6"
                                     : "max-h-0 opacity-0"
                                     }`}
@@ -486,7 +482,7 @@ export default function ConnectAccountsPage() {
                                     className="pt-6 border-t border-border/40 space-y-5"
                                     onClick={(e) => e.stopPropagation()}
                                 >
-                                    {/* URL Input Section — kept visible but API disabled */}
+                                    {/* URL Input Section */}
                                     {!showZipUpload && (
                                         <>
                                             <div className="space-y-2">
@@ -517,7 +513,7 @@ export default function ConnectAccountsPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Error message — will show API disabled message */}
+                                            {/* Error message */}
                                             {linkedinState === "error" && (
                                                 <div className="flex items-start gap-3 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
                                                     <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
@@ -525,13 +521,15 @@ export default function ConnectAccountsPage() {
                                                         <p className="text-sm text-destructive font-medium">
                                                             {linkedinError}
                                                         </p>
-                                                        <button
-                                                            className="text-sm text-primary hover:underline font-medium flex items-center gap-1"
-                                                            onClick={() => setShowZipUpload(true)}
-                                                        >
-                                                            Upload LinkedIn ZIP instead
-                                                            <ArrowRight className="w-3 h-3" />
-                                                        </button>
+                                                        {isPrivate && (
+                                                            <button
+                                                                className="text-sm text-primary hover:underline font-medium flex items-center gap-1"
+                                                                onClick={() => setShowZipUpload(true)}
+                                                            >
+                                                                Upload LinkedIn ZIP instead
+                                                                <ArrowRight className="w-3 h-3" />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             )}
@@ -558,6 +556,7 @@ export default function ConnectAccountsPage() {
                                                     setZipError("");
                                                     setLinkedinState("idle");
                                                     setLinkedinError("");
+                                                    setIsPrivate(false);
                                                 }}
                                             >
                                                 <ArrowLeft className="w-3 h-3" />
@@ -622,9 +621,6 @@ export default function ConnectAccountsPage() {
                                                         )}
                                                     </Button>
                                                 </div>
-                                                <p className="text-[10px] text-muted-foreground/60 italic pl-1">
-                                                    Note: Large ZIP files may take a moment to upload.
-                                                </p>
                                             </div>
 
                                             {/* ZIP errors */}
@@ -654,27 +650,23 @@ export default function ConnectAccountsPage() {
                     </div>
                 </div>
 
-                {/* Continue to Dashboard → now goes to Insights */}
+                {/* Continue to Dashboard */}
                 <div className="mt-10 text-center space-y-4">
                     <Button
                         size="lg"
-                        className={`px-10 h-14 rounded-full text-lg font-semibold shadow-xl transition-all duration-300 group ${canContinue
+                        className={`px-10 h-14 rounded-full text-lg font-semibold shadow-xl transition-all duration-300 group ${bothConnected
                             ? "bg-foreground text-background hover:bg-foreground/90 hover:-translate-y-1 hover:shadow-2xl"
                             : "bg-muted text-muted-foreground cursor-not-allowed opacity-60"
                             }`}
-                        disabled={!canContinue}
-                        onClick={() => router.push("/dashboard/insights")}
+                        disabled={!bothConnected}
+                        onClick={() => router.push("/dashboard")}
                     >
                         Continue to Dashboard
                         <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                     </Button>
-                    {!canContinue && (
+                    {!bothConnected && (
                         <p className="text-xs text-muted-foreground">
-                            {!githubConnected
-                                ? "Connect your GitHub account to continue"
-                                : !hasSynced || !hasAnalyzed
-                                    ? "Sync and analyze your GitHub repositories to continue"
-                                    : "Connect your LinkedIn account to continue"}
+                            Connect both accounts to continue
                         </p>
                     )}
                 </div>

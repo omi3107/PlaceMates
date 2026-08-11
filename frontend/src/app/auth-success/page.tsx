@@ -13,8 +13,9 @@ function AuthSuccessHandler() {
     useEffect(() => {
         const token = searchParams.get("token");
         if (token) {
-            login(token);
-            router.replace("/connect-accounts");
+            login(token).then(() => {
+                router.replace("/connect-accounts");
+            });
         } else {
             router.replace("/Authentication?error=no_token");
         }
