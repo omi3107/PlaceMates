@@ -27,7 +27,7 @@
 
 PlaceMates ingests user data from **two independent pipelines** that converge into a unified profile:
 
-### GitHub Pipeline ([githubAnalysisService.ts](file:///c:/AllImpprojects/PlaceMates/backend/src/services/githubAnalysisService.ts))
+### GitHub Pipeline ([githubAnalysisService.ts](file:///c:/Users/omini/PlaceMates/backend/src/services/githubAnalysisService.ts))
 
 The pipeline is **fully offline** — zero external AI calls:
 
@@ -55,7 +55,7 @@ GitHub API → fetch ALL repos → per-repo analysis → score → select top 10
 - **Meaningfulness filter** (line 182-209): Rejects empty repos, uncontributed forks, and repos with zero meaningful data.
 - **Safe fetch wrappers** (line 215-257): Handles HTTP 409 (empty repos), 404, 422 gracefully — returns `[]` instead of crashing. This is critical because GitHub returns 409 for repos with empty git histories.
 
-### LinkedIn Pipeline ([linkedinAnalysisService.ts](file:///c:/AllImpprojects/PlaceMates/backend/src/services/linkedinAnalysisService.ts))
+### LinkedIn Pipeline ([linkedinAnalysisService.ts](file:///c:/Users/omini/PlaceMates/backend/src/services/linkedinAnalysisService.ts))
 
 ```
 User uploads LinkedIn data export (.zip)
@@ -81,7 +81,7 @@ The merge strategy is critical and often overlooked:
 
 Skills are normalized via `normalizeSkillName()` and deduplicated using composite unique key `[userId, name]`.
 
-### LLM Enrichment ([projectEnrichmentService.ts](file:///c:/AllImpprojects/PlaceMates/backend/src/services/ai/projectEnrichmentService.ts))
+### LLM Enrichment ([projectEnrichmentService.ts](file:///c:/Users/omini/PlaceMates/backend/src/services/ai/projectEnrichmentService.ts))
 
 This is an **optional, additive layer** that runs after offline analysis:
 
@@ -153,7 +153,7 @@ This is an **optional, additive layer** that runs after offline analysis:
 
 The system converts a user's multi-modal, relational data (projects, skills, experience, education, certifications, awards) into a **single text string** that then becomes a **384-dimensional dense vector**.
 
-### Step 1: Text Flattening ([profileTextEncoder.ts](file:///c:/AllImpprojects/PlaceMates/backend/src/services/semantic/profileTextEncoder.ts))
+### Step 1: Text Flattening ([profileTextEncoder.ts](file:///c:/Users/omini/PlaceMates/backend/src/services/semantic/profileTextEncoder.ts))
 
 ```typescript
 // Priority ordering (conceptually weighted by position in string):
@@ -179,7 +179,7 @@ export function computeProfileHash(text: string): string {
 
 MD5 hash of the flattened text. If the hash matches what's stored in `UserEmbedding.profileHash`, skip re-embedding. This saves ~100ms per match cycle.
 
-### Step 3: Embedding ([embedder.py](file:///c:/AllImpprojects/PlaceMates/embedding-service/app/embedder.py))
+### Step 3: Embedding ([embedder.py](file:///c:/Users/omini/PlaceMates/embedding-service/app/embedder.py))
 
 ```python
 model.encode(text, convert_to_numpy=True, normalize_embeddings=True)
@@ -265,7 +265,7 @@ Why SentenceTransformers specifically:
 
 ## 🔹 3.1 WHAT IT DOES
 
-The semantic matching pipeline ([semanticMatchingService.ts](file:///c:/AllImpprojects/PlaceMates/backend/src/services/semantic/semanticMatchingService.ts)) runs the full flow:
+The semantic matching pipeline ([semanticMatchingService.ts](file:///c:/Users/omini/PlaceMates/backend/src/services/semantic/semanticMatchingService.ts)) runs the full flow:
 
 ```
 User profile → text encoding → embedding (or cache hit)
@@ -414,7 +414,7 @@ Apify scrapes jobs
             → POST /api/workflow/n8n-result (callback with results)
 ```
 
-### Upsert Logic ([workflowController.ts](file:///c:/AllImpprojects/PlaceMates/backend/src/controllers/workflowController.ts) line 395-423)
+### Upsert Logic ([workflowController.ts](file:///c:/Users/omini/PlaceMates/backend/src/controllers/workflowController.ts) line 395-423)
 
 ```typescript
 prisma.job.upsert({
@@ -497,7 +497,7 @@ This is the single most important architectural decision in your system.
 
 RAG is the correct choice for your constraints.
 
-## 🔹 5.2 ChromaDB ([resume_store.py](file:///c:/AllImpprojects/PlaceMates/embedding-service/app/resume_store.py))
+## 🔹 5.2 ChromaDB ([resume_store.py](file:///c:/Users/omini/PlaceMates/embedding-service/app/resume_store.py))
 
 ChromaDB stores the **base resume corpus** (7 JSON files × ~15 examples each = ~100 examples).
 
@@ -518,7 +518,7 @@ This is **hybrid retrieval**: metadata pre-filter + semantic search. This is sup
 
 ## 🔹 5.3 RETRIEVAL STRATEGY
 
-The [retrieverAgent.ts](file:///c:/AllImpprojects/PlaceMates/backend/src/services/agents/retrieverAgent.ts) implements **blended retrieval**:
+The [retrieverAgent.ts](file:///c:/Users/omini/PlaceMates/backend/src/services/agents/retrieverAgent.ts) implements **blended retrieval**:
 
 ```
 3 examples from base_resumes (ChromaDB)
@@ -585,14 +585,14 @@ Three specialized agents form an **iterative refinement loop**:
 └───────────────────────────────────────────────────────┘
 ```
 
-### Retriever Agent ([retrieverAgent.ts](file:///c:/AllImpprojects/PlaceMates/backend/src/services/agents/retrieverAgent.ts))
+### Retriever Agent ([retrieverAgent.ts](file:///c:/Users/omini/PlaceMates/backend/src/services/agents/retrieverAgent.ts))
 
 - **Role**: Gather relevant resume examples for context
 - **Sources**: ChromaDB (curated) + PostgreSQL GeneratedResume (self-generated)
 - **Output**: 5 `RetrievedExample` objects
 - **Failure mode**: Returns empty list → Drafter uses zero-shot
 
-### Drafter Agent ([drafterAgent.ts](file:///c:/AllImpprojects/PlaceMates/backend/src/services/agents/drafterAgent.ts))
+### Drafter Agent ([drafterAgent.ts](file:///c:/Users/omini/PlaceMates/backend/src/services/agents/drafterAgent.ts))
 
 - **Role**: Generate a structured resume JSON
 - **Input**: User profile text + job description + RAG examples + (optional) critic feedback
@@ -605,7 +605,7 @@ Three specialized agents form an **iterative refinement loop**:
   4. Only include skills the candidate actually has
   5. Limit to top 3-5 most relevant projects
 
-### Critic Agent ([criticAgent.ts](file:///c:/AllImpprojects/PlaceMates/backend/src/services/agents/criticAgent.ts))
+### Critic Agent ([criticAgent.ts](file:///c:/Users/omini/PlaceMates/backend/src/services/agents/criticAgent.ts))
 
 - **Role**: Score the resume on 5 ATS criteria (0-20 each, total 0-100)
 - **Criteria**:
@@ -686,7 +686,7 @@ Iteration 2: Drafter receives feedback, regenerates with improvements
 
 ## 🔹 7.1 WHAT IT DOES
 
-The [evaluationService.ts](file:///c:/AllImpprojects/PlaceMates/backend/src/services/evaluation/evaluationService.ts) computes **Information Retrieval (IR) metrics** to quantify how well the semantic matching works:
+The [evaluationService.ts](file:///c:/Users/omini/PlaceMates/backend/src/services/evaluation/evaluationService.ts) computes **Information Retrieval (IR) metrics** to quantify how well the semantic matching works:
 
 ### Metrics
 
@@ -748,7 +748,7 @@ After 3 iterations, if the score is still below 75, the problem is structural (u
 
 ## 🔹 8.1 WHAT IT DOES
 
-The [selfImprovingDataset.ts](file:///c:/AllImpprojects/PlaceMates/backend/src/services/agents/selfImprovingDataset.ts) creates a **feedback flywheel**:
+The [selfImprovingDataset.ts](file:///c:/Users/omini/PlaceMates/backend/src/services/agents/selfImprovingDataset.ts) creates a **feedback flywheel**:
 
 ```
 RAG generates resume → Critic scores 92 → Pass quality gate (≥ 90)
